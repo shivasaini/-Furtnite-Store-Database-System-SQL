@@ -1,0 +1,129 @@
+CREATE DEFINER=`root`@`localhost` PROCEDURE `filterentproducts`(IN product varchar(40))
+BEGIN
+select RP_Id, R_ID, RP_name,Category_ID,RP_Price from saleproducts where RP_name= product;
+
+END
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `filtersaleproducts`(IN product varchar(40))
+BEGIN
+select SP_Id, S_ID, SP_name,Category_ID,SP_Price from saleproducts where SP_name= product;
+
+END
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Getrenterhistory`(In ID integer)
+BEGIN
+
+ select Order_ID,rentorders.RP_ID as RP_ID ,rentproduct.Rp_name, rentorders.quantity as RP_quantity, rp_price*quantity as total_price, Cust_ID, Ship_id, Order_date ,Shipping_date, return_date from rentproduct,rentorders where rentproduct.R_ID= ID and rentproduct.RP_ID= rentorders.RP_ID;
+ 
+
+END
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GetSellerhistory`(In ID integer)
+BEGIN
+
+ select Order_ID,salesorders.SP_ID as SP_ID ,saleproducts.Sp_name, salesorders.quantity as SP_quantity, sp_price*quantity as total_price, Cust_ID, Ship_id, Order_date ,Shipping_date from saleproducts,salesorders where saleproducts.S_ID= ID and saleproducts.SP_ID= salesorders.SP_ID;
+ 
+
+END
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `register`(IN ID integer)
+BEGIN
+declare nam varchar(50);
+declare num bigint default 0;
+declare typ varchar(50);
+declare cit varchar (50);
+declare ad varchar (200);
+declare zip bigint;
+declare s int default 0;
+declare r int default 0;
+select Request_type, Store_name , Person_contact,city,address,zipcode  into typ,nam,num,cit,ad,zip from request where request.Request_Id=ID;
+set s= get_id_seller(); -- get last id 
+set r = get_id_renter();-- get last id
+if typ="New Seller"
+	then insert into seller (S_ID,S_name,S_contact,S_city,S_address, S_zipcode) values ( s+1,nam, num, cit,ad, zip);
+end if;
+ if typ="New Renter"
+	then insert into renter (R_ID, R_name,R_contact,R_city,R_address, R_zipcode) values (r+1, nam, num,  cit,ad, zip);
+end if;
+
+END
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `rentorderinvoice`(IN ID integer)
+BEGIN
+select Order_ID, Ship_ID , Cust_ID ,
+sum(rentprice(RP_ID)*S1.quantity) as Total,
+Order_date, Shipping_date, return_Date
+from rentorders s1
+where Cust_ID=ID;
+END
+CREATE DEFINER=`root`@`localhost` PROCEDURE `Saleorderinvoice`(IN ID integer)
+BEGIN
+select Order_ID, Ship_ID , Cust_ID ,
+sum(saleprice(SP_ID)*S1.quantity) as Total,
+Order_date, Shipping_date
+from salesorders s1
+where Cust_ID=ID
+group by Order_ID;
+
+END
+
+Functions
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `get_id_renter`() RETURNS int(11)
+    READS SQL DATA
+    DETERMINISTIC
+BEGIN
+declare q int default 0;
+SELECT R_ID into q FROM renter order BY R_id DESC LIMIT 1;
+RETURN q;
+
+END
+CREATE DEFINER=`root`@`localhost` FUNCTION `get_id_seller`() RETURNS int(11)
+    READS SQL DATA
+    DETERMINISTIC
+BEGIN
+declare q int default 0;
+SELECT S_ID into q FROM seller order BY S_id DESC LIMIT 1;
+RETURN q;
+
+END
+
+
+END
+CREATE DEFINER=`root`@`localhost` FUNCTION `saleprice`(ID Int) RETURNS int(11)
+    READS SQL DATA
+    DETERMINISTIC
+BEGIN
+DECLARE q int default 0;
+select SP_Price into q
+from SaleProducts
+where SP_ID =ID;
+RETURN q;
+END
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `rentprice`(ID Int) RETURNS int(11)
+    READS SQL DATA
+    DETERMINISTIC
+BEGIN
+DECLARE q int default 0;
+select RP_Price into q
+from rentproduct
+where RP_ID =ID;
+RETURN q;
+END
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `offerpricesell`(ID Int) RETURNS int(11)
+    READS SQL DATA
+    DETERMINISTIC
+BEGIN
+DECLARE q int default 0;
+##DECLARE f int default 0;
+if month(curdate())= 04
+then select (S.Sp_price - S.Sp_price*O.off*0.01) into q from saleproducts S, offerpricesaleprod O where S.SP_ID=O.SP_ID AND S.SP_ID= ID ;
+end if;
+if  month(curdate())<> 04
+then select (S.Sp_price) into q from saleproducts S where S.SP_ID= ID ;
+end if;
+
+RETURN q;
+
+END
